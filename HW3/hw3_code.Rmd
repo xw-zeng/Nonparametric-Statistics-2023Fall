@@ -1,0 +1,281 @@
+---
+title: "STA104 - Homework 3"
+author: "Xiaowei Zeng"
+date: "`r Sys.Date()`"
+output: pdf_document
+# fontsize: 11pt
+#output: 
+#  pdf_document:
+#    number_sections: true
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Problem 1
+
+Load the dataset for problem 1.
+```{r}
+library(readxl)
+data1 = read_xlsx('data for problem 1 page 105.xlsx')
+head(data1)
+```
+
+### a. Apply the permutation F-test to the data. 
+
+Compute $F_{\text{obs}}$ statistic for the data.
+```{r}
+fit1 = lm(count ~ treat, data = data1)
+F_obs = summary(fit1)[[10]][1]
+F_obs
+```
+
+The total number of permutation is
+$$
+\frac{N!}{n_1!n_2!n_3!}=\frac{15!}{4!6!5!}=630630,
+$$
+which is too large for us to compute the exact permutation $p$-value. So we use simulation to conduct the permutation F-test.
+```{r}
+permut_num = 10000
+f = rep(0, permut_num)
+set.seed(2023) # for reproducibility
+for (i in 1:permut_num){
+  permut = sample(data1$count)
+  fit = lm(permut ~ data1$treat)
+  f[i] = summary(fit)[[10]][1]
+}
+p_value1 = sum(f >= F_obs) / permut_num
+p_value1
+```
+
+The approximate $p$-value of the permutation F-test is 0, indicating that we should reject the null hypothesis at any significance level.
+
+### b. Compare the results in part a with the results of the usual one-way analysis of variance.
+
+Conduct the usual one-way anova test.
+```{r}
+fit2 = aov(count ~ treat, data = data1)
+p_value2 = summary(fit2)[[1]][['Pr(>F)']][1]
+p_value2
+```
+
+The $p$-value of anova is 0.00114. Suppose that the significance level is 0.05, so we should reject the null hypothesis, which is the same conclusion as the permutation test. 
+
+## Problem 2
+
+Load the dataset for problem 2.
+```{r}
+data2 = read_xlsx('data for problem 2 page 105.xlsx', range = 'A1:B48')
+colnames(data2) = c('weight', 'load')
+data2$weight = factor(data2$weight)
+head(data2)
+```
+
+### a. Apply the permutation F-test and the ANOVA F-test to the data, and compare $p$-values. 
+
+Compute $F_{\text{obs}}$ statistic for the data.
+```{r}
+fit1 = lm(load ~ weight, data = data2)
+F_obs = summary(fit1)[[10]][1]
+F_obs
+```
+
+The total number of permutation is also too large for us to compute the exact permutation $p$-value. So we use simulation to conduct the permutation F-test.
+```{r}
+permut_num = 10000
+f = rep(0, permut_num)
+set.seed(2023) # for reproducibility
+for (i in 1:permut_num){
+  permut = sample(data2$load)
+  fit = lm(permut ~ data2$weight)
+  f[i] = summary(fit)[[10]][1]
+}
+p_value1 = sum(f >= F_obs) / permut_num
+p_value1
+```
+
+Suppose that the significance level is 0.05. The approximate $p$-value of the permutation F-test is 0.4445 > 0.05, indicating that we cannot reject the null hypothesis.
+
+Then conduct the anova test.
+```{r}
+fit2 = aov(load ~ weight, data = data2)
+p_value2 = summary(fit2)[[1]][['Pr(>F)']][1]
+p_value2
+```
+
+The $p$-value of anova is 0.4458 > 0.05, indicating that we cannot reject the null hypothesis, which is the same conclusion as the permutation test. The $p$-values of both tests are really close.
+
+### b. Does it appear that the data are normally distributed? 
+
+Since the $p$-values of anova and the permutation test don't differ much, we can assume that the data may be normally distributed. We can also check this assumption by Q-Q plot and Shapiro-Wilk normality test.
+```{r qq, fig.align='center', out.width='65%'}
+qqnorm(data2$load); qqline(data2$load)
+```
+
+The data points almost form a straight line, suggesting that it approximately follows the normal distribution. 
+```{r}
+shapiro.test(data2$load)
+```
+
+The $p$-value is 0.6167, much larger than 0.05, so we cannot reject the normality of the data.
+
+## Problem 3
+
+### a. Apply the Kruskal-Wallis test to the data in Problem 1.
+
+Define a function to calculate the ranks and the Kruskal-Wallis statistics.
+```{r, message=FALSE}
+library(dplyr)
+calc_KW = function(N, treat, values){
+  temp = data.frame(treat = treat, rank = rank(values))
+  df_group = temp %>% group_by(treat) %>% summarise(n = length(rank), mr = mean(rank))
+  KW = 12 / (N * (N + 1)) * sum(df_group$n * (df_group$mr - (N + 1) / 2) ^ 2)
+  return(KW)
+}
+```
+
+Obtain the observed KW statistics.
+```{r}
+N = nrow(data1)
+KW_obs = calc_KW(N, data1$treat, data1$count)
+KW_obs
+```
+
+The total number of permutation is also too large for us to compute the exact permutation $p$-value. So we use simulation to conduct the permutation Kruskal-Wallis test.
+```{r}
+permut_num = 10000
+kw = rep(0, permut_num)
+set.seed(2023) # for reproducibility
+for (i in 1:permut_num){
+  permut = sample(data1$count)
+  kw[i] = calc_KW(N, data1$treat, permut)
+}
+p_value3 = sum(kw >= KW_obs) / permut_num
+p_value3
+```
+
+### b. Compare the conclusions with those obtained in Problem 1.
+
+Suppose that the significance level is 0.05. The approximate $p$-value of the permutation Kruskal-Wallis test is 0, the same as the permutation F-test; the $p$-value of the one-way anova test is 0.00114; all of the $p$-values are smaller than 0.05. So we can conduct the same conclusion that we should reject the null hypothesis.
+
+## Problem 4
+
+Load the dataset for problem 6.
+```{r}
+data6 = read_xlsx('data for problem 6 page 106.xlsx', range = 'A1:B71')
+colnames(data6) = c('type', 'injury')
+data6$type = factor(data6$type)
+head(data6)
+```
+
+### a. Test for differences among the groups using the Kruskal-Wallis test. 
+
+Use the function defined before. Obtain the observed KW statistics.
+```{r}
+N = nrow(data6)
+KW_obs = calc_KW(N, data6$type, data6$injury)
+KW_obs
+```
+
+The total number of permutation is also too large for us to compute the exact permutation $p$-value. So we use simulation to conduct the permutation Kruskal-Wallis test.
+```{r}
+permut_num = 10000
+kw = rep(0, permut_num)
+set.seed(2023) # for reproducibility
+for (i in 1:permut_num){
+  permut = sample(data6$injury)
+  kw[i] = calc_KW(N, data6$type, permut)
+}
+p_value = sum(kw >= KW_obs) / permut_num
+p_value
+```
+
+Suppose that the significance level is 0.05. The $p$-value of the permutation KW test is 0.0132 < 0.05, indicating that we should reject the null hypothesis.
+
+### b. Separate means using the rank versions of the LSD and HSD criteria. 
+
+Since the result of the permutation K-W test is significant at level $\alpha=0.05$, we can use ranked-based LSD and HSD criteria to conduct $7\mathbf{C}2=21$ pairwise comparisons.
+
+#### i. Rank version of LSD criteria.
+
+We declare the distributions of treatments $i$ and $j$ to be different if
+$$
+\left|\bar{R}_{i}-\bar{R}_{j}\right| \geq z_{1-\frac{\alpha}{2}} \sqrt{\frac{N(N+1)}{12}\left(\frac{1}{n_{i}}+\frac{1}{n_{j}}\right)}.
+$$
+
+Since the number of samples in each group is the same in this problem, i.e. $n_i=n=10, i=1,\dots, 7$, we can simplify this expression into
+$$
+\left|\bar{R}_{i}-\bar{R}_{j}\right| \geq z_{1-\frac{\alpha}{2}} \sqrt{\frac{N(N+1)}{6n}}.
+$$
+
+Compute the results.
+```{r}
+data6$rank = rank(data6$injury)
+df_group = data6 %>% group_by(type) %>% summarise(n = length(rank), mr = mean(rank))
+k = length(df_group$type)
+n = df_group$n[1]
+tmp = matrix(rep(df_group$mr, k), nrow = k)
+test_stat = abs(t(tmp) - tmp)
+lsd = qnorm(1 - 0.05 / 2) * sqrt((N * (N + 1) / (6 * n)))
+test_stat >= lsd
+```
+
+The results show that six pairs, (type2, type3), (type2, type5), (type2, type6), (type2, type7), (type4, type5) and (type4, type7), are significantly different from each other.
+
+#### ii. Rank version of HSD criteria.
+
+We declare the distributions of treatments $i$ and $j$ to be different if
+$$
+\left|\bar{R}_{i}-\bar{R}_{j}\right| \geq q(\alpha,k,\infty) \sqrt{\frac{N(N+1)}{12n}}.
+$$
+
+Compute the results.
+```{r}
+hsd = qtukey(1 - 0.05, k, Inf) * sqrt((N * (N + 1) / (12 * n)))
+test_stat >= hsd
+```
+
+The results show that only one pair, (type2, type5), is significantly different from each other.
+
+## Problem 5
+
+Obtain the upper 10\% and 5\% critical values of the permutation version of Tukey's HSD for the data in Problem 6.
+
+The Tukey multiple comparison statistic is defined as
+$$
+Q^* = \frac{\max(\bar X_i) - \min(\bar X_j)}{\sqrt{\text{MSE}/n}}.
+$$
+
+Simulate the permutation distribution of $Q^*$.
+```{r}
+permut_num = 10000
+q = rep(0, permut_num)
+set.seed(2023) # for reproducibility
+for (i in 1:permut_num){
+  permut = sample(data6$injury)
+  tmp = data.frame(type = data6$type, injury = permut)
+  df_group = tmp %>% group_by(type) %>% summarise(mean = mean(injury), var = var(injury))
+  mse = (n - 1) * sum(df_group$var) / (N - k)
+  q[i] = (max(df_group$mean) - min(df_group$mean)) / sqrt(mse / n)
+}
+```
+
+Plot the histogram of $Q^*$ and the corresponding critical value.
+```{r, fig.align='center', out.width='65%'}
+u.1 = quantile(q, 0.9)
+u.05 = quantile(q, 0.95)
+hist(q); abline(v = u.1, col = 2); abline(v = u.05, col = 4)
+legend('topright', c('10% upper', '5% upper'), col = c(2, 4), lty = 1)
+```
+
+The upper 10\% critical value is 3.89.
+```{r}
+u.1
+```
+
+The upper 5\% critical value is 4.29.
+```{r}
+u.05
+```
